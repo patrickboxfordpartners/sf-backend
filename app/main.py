@@ -11,7 +11,7 @@ from app import __version__
 from app.config import get_settings
 from app.crud import count_contacts
 from app.database import engine, get_db, init_db
-from app.routers import contacts
+from app.routers import addresses, contacts
 from app.schemas import HealthResponse, RootResponse
 from app.seed import seed_if_empty
 
@@ -48,6 +48,13 @@ TAGS_METADATA = [
         "description": (
             "Create, read, update, and delete contacts. Emails are unique across "
             "the collection, compared case-insensitively."
+        ),
+    },
+    {
+        "name": "addresses",
+        "description": (
+            "Manage multiple addresses per contact. Each address has a type (Home, Work, Other) "
+            "and full postal details. One-to-many relationship with cascade delete."
         ),
     },
     {
@@ -89,6 +96,7 @@ app.add_middleware(
 )
 
 app.include_router(contacts.router)
+app.include_router(addresses.router)
 
 
 @app.get(

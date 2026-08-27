@@ -1,13 +1,21 @@
 from datetime import datetime, timezone
+from enum import Enum as PyEnum
 
-from sqlalchemy import DateTime, Integer, String, Text, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+class AddressType(str, PyEnum):
+    """Address type enumeration: Home, Work, or Other."""
+    HOME = "Home"
+    WORK = "Work"
+    OTHER = "Other"
 
 
 class Contact(Base):
@@ -43,9 +51,44 @@ class Contact(Base):
         nullable=False,
     )
 
+    # Relationship to addresses
+    addresses: Mapped[list["Address"]] = relationship("Address", back_populates="contact", cascade="all, delete-orphan")
+
     @property
     def full_name(self) -> str:
         return f"{self.first_name} {self.last_name}".strip()
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return f"<Contact id={self.id} email={self.email!r}>"
+
+
+class Address(Base):
+    """Address associated with a contact (one-to-many relationship)."""
+    __tablename__ = "addresses"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    contact_id: Mapped[int] = mapped_column(ForeignKey("contacts.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    type: Mapped[AddressType] = mapped_column(Enum(AddressType), nullable=False, default=AddressType.HOME)
+    address: Mapped[str | None] = mapped_column(String(300))
+    city: Mapped[str | None] = mapped_column(String(120))
+    state: Mapped[str | None] = mapped_column(String(120))
+    postal_code: Mapped[str | None] = mapped_column(String(20))
+    country: Mapped[str | None] = mapped_column(String(120))
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=_utcnow,
+        onupdate=_utcnow,
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    # Relationship back to contact
+    contact: Mapped["Contact"] = relationship("Contact", back_populates="addresses")
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid
+        return f"<Address id={self.id} contact_id={self.contact_id} type={self.type.value}>"

@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field, field_validator
 
+from app.models import AddressType
+
 
 class ContactBase(BaseModel):
     """Fields shared by every contact request and response."""
@@ -194,6 +196,77 @@ class ContactPage(BaseModel):
     )
     limit: int = Field(description="Page size that was applied.", examples=[50])
     offset: int = Field(description="Number of records skipped.", examples=[0])
+
+
+# ========== Address Schemas (One-to-Many Relationship) ==========
+
+
+class AddressBase(BaseModel):
+    """Fields shared by every address request and response."""
+
+    type: AddressType = Field(
+        default=AddressType.HOME,
+        description="Address type: Home, Work, or Other.",
+        examples=["Home"],
+    )
+    address: str | None = Field(
+        default=None,
+        max_length=300,
+        description="Street address, including unit or suite.",
+        examples=["1 Market St, Suite 400"],
+    )
+    city: str | None = Field(default=None, max_length=120, description="City or locality.", examples=["San Francisco"])
+    state: str | None = Field(
+        default=None,
+        max_length=120,
+        description="State, province, or region.",
+        examples=["CA"],
+    )
+    postal_code: str | None = Field(
+        default=None,
+        max_length=20,
+        description="Postal or ZIP code.",
+        examples=["94105"],
+    )
+    country: str | None = Field(default=None, max_length=120, description="Country name.", examples=["USA"])
+
+
+class AddressCreate(AddressBase):
+    """Body of `POST /api/v1/contacts/{contact_id}/addresses`."""
+    pass
+
+
+class AddressUpdate(BaseModel):
+    """Body of `PATCH /api/v1/addresses/{address_id}`."""
+
+    type: AddressType | None = Field(default=None, description="New address type.")
+    address: str | None = Field(default=None, max_length=300, description="New street address.")
+    city: str | None = Field(default=None, max_length=120, description="New city.")
+    state: str | None = Field(default=None, max_length=120, description="New state or region.")
+    postal_code: str | None = Field(default=None, max_length=20, description="New postal code.")
+    country: str | None = Field(default=None, max_length=120, description="New country.")
+
+
+class AddressRead(AddressBase):
+    """A stored address, as returned by address endpoints."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int = Field(description="Server-assigned identifier.", examples=[1])
+    contact_id: int = Field(description="ID of the contact this address belongs to.", examples=[1])
+    created_at: datetime = Field(
+        description="UTC timestamp of when the address was created.",
+        examples=["2026-08-26T16:22:58.189507Z"],
+    )
+    updated_at: datetime = Field(
+        description="UTC timestamp of the last modification.",
+        examples=["2026-08-26T16:22:58.189511Z"],
+    )
+
+    @field_validator("created_at", "updated_at")
+    @classmethod
+    def _as_utc(cls, value: datetime) -> datetime:
+        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
 
 
 class HealthResponse(BaseModel):
